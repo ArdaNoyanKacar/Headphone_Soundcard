@@ -73,7 +73,7 @@
 #define CHIP_CLK_CTRL_SYS_FS_MASK      0x000C // Bits 3:2
 #define CHIP_CLK_CTRL_SYS_FS_SHIFT     2
 #define CHIP_CLK_CTRL_SYS_FS_96K       0x3 // 0x3 = 96kHz
-#define CHIP_CLK_CTRL_SYS_FS_48K       0x3 // 0x2 = 48kHz
+#define CHIP_CLK_CTRL_SYS_FS_48K       0x2 // 0x2 = 48kHz
 
 #define CHIP_CLK_CTRL_MCLK_FREQ_MASK   0x0003 // Bits 1:0
 #define CHIP_CLK_CTRL_MCLK_FREQ_SHIFT  0
@@ -84,21 +84,21 @@
 
 // CHIP_I2S_CTRL (0x0006) I2S Control
 // Combined I2S Config
-#define CHIP_I2S_CTRL_CFG_MASK        0x0030 //SCLKFREQ=64Fs, MS=Slave, SCLK_INV=0, DLEN=16, I2S mode via LRALIGN=0, LRPOL=0
+#define CHIP_I2S_CTRL_DEFAULT       0x0030 //SCLKFREQ=64Fs, MS=Slave, SCLK_INV=0, DLEN=16, I2S mode via LRALIGN=0, LRPOL=0
 
 // SCLKFREQ 
 #define CHIP_I2S_CTRL_SCLK_FREQ_MASK  0x0100 // Bit 8
 #define CHIP_I2S_CTRL_SCLK_FREQ_SHIFT 8
-#define CHIP_I2S_CTRL_SCLK_FREQ_64FS  0x1 // 0x1 = SCLK frequency is 64*Fs
-#define CHIP_I2S_CTRL_SCLK_FREQ_32FS  0x0 // 0x0 = SCLK frequency is 32*Fs
+#define CHIP_I2S_CTRL_SCLK_FREQ_32FS  0x1 // 0x1 = SCLK frequency is 32*Fs
+#define CHIP_I2S_CTRL_SCLK_FREQ_64FS  0x0 // 0x0 = SCLK frequency is 64*Fs
 
 // DLEN
-#define CHIP_I2S_CTRL_DLEN_MASK       0x0060 // Bits 5:4
+#define CHIP_I2S_CTRL_DLEN_MASK       0x0030 // Bits 5:4
 #define CHIP_I2S_CTRL_DLEN_SHIFT      4
-#define CHIP_I2S_CTRL_DLEN_32BITS     0x3 // 0x3 = 16 bits per sample
-#define CHIP_I2S_CTRL_DLEN_24BITS     0x2 // 0x2 = 20 bits per sample 
-#define CHIP_I2S_CTRL_DLEN_20BITS     0x1 // 0x1 = 24 bits per sample (Only valid when SCLK frequency is 64*Fs)
-#define CHIP_I2S_CTRL_DLEN_16BITS     0x0 // 0x0 = 32 bits per sample (Only valid when SCLK frequency is 64*Fs)
+#define CHIP_I2S_CTRL_DLEN_16BITS     0x3 // 0x3 = 16 bits per sample
+#define CHIP_I2S_CTRL_DLEN_20BITS     0x2 // 0x2 = 20 bits per sample 
+#define CHIP_I2S_CTRL_DLEN_24BITS     0x1 // 0x1 = 24 bits per sample (Only valid when SCLK frequency is 64*Fs)
+#define CHIP_I2S_CTRL_DLEN_32BITS     0x0 // 0x0 = 32 bits per sample (Only valid when SCLK frequency is 64*Fs)
 
 // CHIP_SSS_CTRL (0x000A) System Signal Routing
 // DAP_SELECT
@@ -163,6 +163,23 @@
 #define ADCDAC_CTRL_DAC_MUTE_ON    0x3 // 0x3 = Mute DAC
 #define ADCDAC_CTRL_DAC_MUTE_OFF   0x0 // 0x0 = Unmute DAC
 
+// CHIP_ANA_POWER (0x0030) Analog Power Control
+#define CHIP_ANA_POWER_PLL_EN_MASK  0x0400 // Bit 10
+#define CHIP_ANA_POWER_PLL_EN_SHIFT 10
+#define CHIP_ANA_POWER_PLL_EN       0x1 // 0x1 = Enable PLL
+#define CHIP_ANA_POWER_PLL_DIS      0x0 // 0x0 = Disable
+
+#define CHIP_ANA_POWER_VCOMP_POWERUP_MASK 0x0100 // Bit 8
+#define CHIP_ANA_POWER_VCOMP_POWERUP_SHIFT 8
+#define CHIP_ANA_POWER_VCOMP_POWERUP 0x1 // 0x1 = Power up VCOMP
+#define CHIP_ANA_POWER_VCOMP_POWERDOWN 0x0 // 0x0 = Power down VCOMP
+
+// CHIP_CLK_TOP_CTRL (0x0034) Clock Top Control
+#define CHIP_CLK_TOP_CTRL_INPUT_FREQ_DIV2_MASK 0x0008 // Bit 3
+#define CHIP_CLK_TOP_CTRL_INPUT_FREQ_DIV2_SHIFT 3
+#define CHIP_CLK_TOP_CTRL_INPUT_FREQ_DIV2 0x1 // 0x1 = Divide input frequency by 2
+#define CHIP_CLK_TOP_CTRL_INPUT_FREQ_DIV1 0x0 // 0x0 = Do not divide input frequency
+
 
 
 
@@ -181,7 +198,7 @@ typedef enum {
 
 // I2S Configuration
 typedef struct {
-    uint32_t sclk_freq; // SCLK frequency 
+    uint8_t sclk_freq; // SCLK frequency 
     uint8_t ms_mode; // Master/Slave mode 
     uint8_t sclk_inv; // SCLK inversion 
     uint8_t dlen; // Data length 
@@ -196,25 +213,28 @@ typedef struct {
     audio_output_t audio_output; // Destination of audio output
     bool dsp_enable; // Enable Digital Signal Processing
     uint32_t sys_mclk; // System Master Clock frequency in MHz
-    uint32_t sys_fs; // System Sampling Frequency in MHz
+    uint32_t sys_fs; // System Sampling Frequency in Hz
     i2s_config_t i2s_config; // I2S configuration
+    uint8_t volume; // Volume level
 } sgtl5000_config_t;
 
 
 
 // Function Prototypes
-uint16_t sgtl5000_reg_read(uint16_t reg, uint16_t* val);
+
+// SGTL5000 Register Operations
+uint8_t  sgtl5000_reg_read(uint16_t reg, uint16_t* val);
 uint8_t  sgtl5000_reg_write(uint16_t reg, uint16_t val);
 uint8_t  sgtl5000_reg_write_verify(uint16_t reg, uint16_t val);
 uint8_t  sgtl5000_reg_modify(uint16_t reg, uint16_t mask, uint8_t shift, uint16_t value);
 uint8_t  sgtl5000_reg_modify_verify(uint16_t reg, uint16_t mask, uint8_t shift, uint16_t value);
+
+// SGTL5000 Initializaition and Confgiuration
 uint8_t  sgtl5000_powerup();
 uint8_t  sgtl5000_clock_config();
-uint8_t  sgtl5000_pll_setup(uint32_t sys_mclk, uint32_t sys_fs);
-uint8_t  sgtl5000_dsp_config();
 uint8_t  sgtl5000_input_output_route(audio_source_t source, audio_output_t output, bool dsp_enable);
 uint8_t  sgtl5000_configure_i2s(i2s_config_t* i2s_config_t);
-uint8_t  sgtl5000_set_adc_gain(uint16_t gain);
-uint8_t  sgtl5000_adjust_volume(uint8_t volume, audio_source_t source, audio_output_t output);
+uint8_t  sgtl5000_adjust_volume(uint8_t volume, audio_output_t output, bool init);
 uint8_t  sgtl5000_configure_dsp();
+uint8_t  sgtl5000_init(sgtl5000_config_t* config);
 #endif
