@@ -111,6 +111,25 @@ uint8_t sgtl5000_reg_modify_verify(uint16_t reg, uint16_t mask, uint8_t shift, u
 }
 
 /**
+ * @brief Read the ID register of SGTL5000 audio codec
+ */
+uint8_t sgtl5000_read_id()
+{
+    uint16_t id_combined = 0;
+
+    uint8_t status = sgtl5000_reg_read(SGTL5000_CHIP_ID, &id_combined);
+    uint8_t part_id = (id_combined >> 8) & 0xFF; // Extract Part ID
+    uint8_t revision_id = id_combined & 0xFF; // Extract Revision ID
+
+    if (status != I2C_SUCCESS) {
+        printf("Failed to read SGTL5000 ID\n");
+        return status;
+    }
+    printf("SGTL5000 ID: Part ID = 0x%02X, Revision ID = 0x%02X\n", part_id, revision_id);
+    return I2C_SUCCESS;
+}
+
+/**
  * @brief Power up the SGTL5000 audio codec
  * 
  */

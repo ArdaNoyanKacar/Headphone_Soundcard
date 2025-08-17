@@ -230,6 +230,7 @@ uint8_t  sgtl5000_reg_modify(uint16_t reg, uint16_t mask, uint8_t shift, uint16_
 uint8_t  sgtl5000_reg_modify_verify(uint16_t reg, uint16_t mask, uint8_t shift, uint16_t value);
 
 // SGTL5000 Initializaition and Confgiuration
+uint8_t  sgtl5000_read_id();
 uint8_t  sgtl5000_powerup();
 uint8_t  sgtl5000_clock_config();
 uint8_t  sgtl5000_input_output_route(audio_source_t source, audio_output_t output, bool dsp_enable);
