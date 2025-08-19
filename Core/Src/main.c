@@ -103,7 +103,7 @@ int main(void)
   // Create CODEC config
   sgtl5000_config_t cfg = {
     .audio_source = AUDIO_SOURCE_LINEIN,
-    .audio_output = AUDIO_OUTPUT_HP,
+    .audio_output = AUDIO_OUTPUT_BOTH,
     .dsp_enable   = false,
     .sys_mclk     = 12288000,
     .sys_fs       = 48000,

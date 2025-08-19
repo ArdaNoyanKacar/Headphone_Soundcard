@@ -166,7 +166,7 @@ uint8_t sgtl5000_powerup()
         printf("Error code: %d\r\n", status);
         return status; // Return if write failed
     }
-    status = sgtl5000_reg_write_verify(SGTL5000_CHIP_LINE_OUT_CTRL, 0x0322); // Set lineout reference voltage to VDDIO / 2 (1.65V)
+    status = sgtl5000_reg_write_verify(SGTL5000_CHIP_LINE_OUT_CTRL, 0x031E); // Set lineout reference voltage to VDDIO / 2 (1.65V)
     if (status != I2C_SUCCESS) {
         printf("FAIL: Failed to set reference voltage\r\n");
         printf("Error code: %d\r\n", status);
@@ -189,31 +189,21 @@ uint8_t sgtl5000_powerup()
         return status; // Return if write failed
     }
 
-    status = sgtl5000_reg_write_verify(SGTL5000_CHIP_SHORT_CTRL, 0x5508); 
-    if (status != I2C_SUCCESS) {
-        printf("FAIL: Failed to temporarily disable short circuit protection\r\n");
-        printf("Error code: %d\r\n", status);
-        return status; // Return if write failed
-    }
+    // Disable/clear short detect while we power analog
+    status = sgtl5000_reg_write_verify(SGTL5000_CHIP_SHORT_CTRL, 0x5508);
+    if (status != I2C_SUCCESS) return status;
 
-    HAL_Delay(100); // Let bias
-
-    status = sgtl5000_reg_write_verify(SGTL5000_CHIP_SHORT_CTRL, 0x1104);
-    if (status != I2C_SUCCESS) {
-        printf("FAIL: Failed to enable short circuit protection\r\n");
-        printf("Error code: %d\r\n", status);
-        return status; // Return if write failed
-    }
-
-    //sgtl5000_reg_write(SGTL5000_CHIP_ANA_CTRL, 0x0133); // Enable zero-cross detect
+    HAL_Delay(100); // Let bias settle
 
     // Power up Inputs/Outputs/Digital Blocks
     status = sgtl5000_reg_write_verify(SGTL5000_CHIP_ANA_POWER, 0x40FB);
-    if (status != I2C_SUCCESS) {
-        printf("FAIL: Failed to power up analog blocks\r\n");
-        printf("Error code: %d\r\n", status);
-        return status; // Return if write failed
-    }
+    if (status != I2C_SUCCESS) return status;
+
+    HAL_Delay(100); // allow VAG/HP/LO to settle
+
+    // NOW re-enable LR short detect
+    status = sgtl5000_reg_write_verify(SGTL5000_CHIP_SHORT_CTRL, 0x1104);
+    if (status != I2C_SUCCESS) return status;
 
     // Power up digital blocks
     // I2S_IN (bit 0), I2S_OUT (bit 1), DAP (bit 4), DAC (bit 5), // ADC (bit 6) are powered on
@@ -225,7 +215,7 @@ uint8_t sgtl5000_powerup()
     }
 
     // Set LINEOUT volume level
-    status = sgtl5000_reg_write_verify(SGTL5000_CHIP_LINE_OUT_VOL, 0x0505);
+    status = sgtl5000_reg_write_verify(SGTL5000_CHIP_LINE_OUT_VOL, 0x0606);
     if (status != I2C_SUCCESS) {
         printf("FAIL: Failed to set LINEOUT volume level\r\n");
         printf("Error code: %d\r\n", status);
@@ -369,6 +359,36 @@ uint8_t sgtl5000_input_output_route(audio_source_t source, audio_output_t output
         }  
     }
 
+
+    // === FORCE LINEIN -> ADC -> DAC -> HP + LINEOUT (stereo) ===
+    printf("Activating the forcing\r\n");
+    status |= sgtl5000_reg_write(SGTL5000_CHIP_SSS_CTRL, 0x0000);      // DAP_SELECT=ADC, DAC_SELECT=ADC, I2S_OUT=ADC
+    status |= sgtl5000_reg_write(SGTL5000_CHIP_ADCDAC_CTRL, 0x0000);   // Clear DAC mutes/ramps/filters while debugging
+    status |= sgtl5000_reg_write(SGTL5000_CHIP_ANA_CTRL, 0x0004);      // ADC=LINEIN, HP_SEL=DAC, HP unmuted, LO unmuted
+    status |= sgtl5000_reg_write(SGTL5000_CHIP_DAC_VOL, 0x3C3C);       // 0 dB digital DAC volume
+    status |= sgtl5000_reg_write(SGTL5000_CHIP_ANA_HP_CTRL, 0x2F2F);   // ~0 dB HP analog gain (not +12 dB)
+
+
+    // Start the DAC volume ramp engine and re-assert target
+    status |= sgtl5000_reg_write(SGTL5000_CHIP_ADCDAC_CTRL, 0x0200);   // VOL_RAMP_EN=1, mutes=0, RSVD=0
+    status |= sgtl5000_reg_write(SGTL5000_CHIP_DAC_VOL,      0x3C3C);   // 0 dB target for the ramp
+
+    // Optional: wait briefly for VOL_BUSY to clear
+    uint16_t adcdac;
+    bool busy_cleared = false;
+    for (int i = 0; i < 50; i++) {      // up to ~100 ms
+        sgtl5000_reg_read(SGTL5000_CHIP_ADCDAC_CTRL, &adcdac);
+        if ((adcdac & 0x3000) == 0) {
+            busy_cleared = true;
+            break;  // both VOL_BUSY flags cleared
+        }
+        printf("Waiting for VOL_BUSY to clear...\r\n");
+        HAL_Delay(2);
+    }
+
+    if (!busy_cleared) {
+        printf("VOL_BUSY did not clear in time\r\n");
+    }
     return status;
 }
 
@@ -429,10 +449,10 @@ uint8_t  sgtl5000_adjust_volume(uint8_t volume, audio_output_t output, bool init
                 CHIP_ANA_CTRL_HP_MUTE_SHIFT, CHIP_ANA_CTRL_HP_MUTE_OFF);
 
             if (hp_from_dac) {
-                // Unmute DAC
-                status |= sgtl5000_reg_write_verify(SGTL5000_CHIP_DAC_VOL, 0x3C3C); // 0dB 
-                status |= sgtl5000_reg_modify_verify(SGTL5000_CHIP_ADCDAC_CTRL, ADCDAC_CTRL_DAC_MUTE_MASK, 
-                ADCDAC_CTRL_DAC_MUTE_SHIFT, ADCDAC_CTRL_DAC_MUTE_OFF);
+                // Unmute DAC (HP may be switched to DAC in this call)
+                status |= sgtl5000_reg_write_verify(SGTL5000_CHIP_DAC_VOL, 0x3C3C); // 0 dB
+                status |= sgtl5000_reg_modify_verify(SGTL5000_CHIP_ADCDAC_CTRL,
+                                ADCDAC_CTRL_DAC_MUTE_MASK, ADCDAC_CTRL_DAC_MUTE_SHIFT, ADCDAC_CTRL_DAC_MUTE_OFF);
             }
         }
 
