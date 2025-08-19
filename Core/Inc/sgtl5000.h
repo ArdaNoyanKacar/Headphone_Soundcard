@@ -17,6 +17,9 @@
 #define HP_VOL_MIN 0x7F
 #define HP_VOL_MAX 0x00 // +12dB
 
+// I2S
+#define I2S_USE_DEFAULT 0xFF
+
 // Register Address
 #define SGTL5000_CHIP_ID				0x0000
 #define SGTL5000_CHIP_DIG_POWER			0x0002
@@ -214,7 +217,7 @@ typedef struct {
     bool dsp_enable; // Enable Digital Signal Processing
     uint32_t sys_mclk; // System Master Clock frequency in MHz
     uint32_t sys_fs; // System Sampling Frequency in Hz
-    i2s_config_t i2s_config; // I2S configuration
+    i2s_config_t *i2s_config; // I2S configuration
     uint8_t volume; // Volume level
 } sgtl5000_config_t;
 
@@ -231,6 +234,7 @@ uint8_t  sgtl5000_reg_modify_verify(uint16_t reg, uint16_t mask, uint8_t shift, 
 
 // SGTL5000 Initializaition and Confgiuration
 uint8_t  sgtl5000_read_id();
+uint8_t  sgtl5000_print_all_regs();
 uint8_t  sgtl5000_powerup();
 uint8_t  sgtl5000_clock_config();
 uint8_t  sgtl5000_input_output_route(audio_source_t source, audio_output_t output, bool dsp_enable);
