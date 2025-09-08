@@ -110,7 +110,14 @@ int main(void)
     .volume       = HP_VOL_MAX,
     .i2s_config   = NULL
   };
-  sgtl5000_init(&cfg);
+  uint8_t status;
+  status = sgtl5000_init(&cfg);
+  if (status != I2C_SUCCESS) {
+      printf("SGTL5000 initialization failed\r\n");
+  }
+  else {
+      printf("SGTL5000 initialized successfully\r\n");
+  }
   uint16_t reg_value;
   sgtl5000_reg_read(SGTL5000_CHIP_ANA_STATUS, &reg_value);
   printf("SGTL5000 ANA_STATUS: 0x%04X\r\n", reg_value);
@@ -124,7 +131,8 @@ int main(void)
   while (1)
   {
     /* USER CODE END WHILE */
-
+    sgtl5000_reg_read(SGTL5000_CHIP_ADCDAC_CTRL, &reg_value);
+    printf("SGTL5000 ADCDAC_CTRL: 0x%04X\r\n", reg_value);
     /* USER CODE BEGIN 3 */
     // Blink LED or do other tasks...
     HAL_GPIO_TogglePin(GPIOE, GPIO_PIN_3);
