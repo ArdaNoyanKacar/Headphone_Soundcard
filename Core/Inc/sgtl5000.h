@@ -185,44 +185,6 @@
 
 
 
-
-// Audio Source Options
-typedef enum {
-    AUDIO_SOURCE_LINEIN = 0,
-    AUDIO_SOURCE_I2S
-} audio_source_t;
-
-// Audio Output Options
-typedef enum {
-    AUDIO_OUTPUT_LINEOUT = 0,
-    AUDIO_OUTPUT_HP,
-    AUDIO_OUTPUT_BOTH, // Both Lineout and HP
-} audio_output_t;
-
-// I2S Configuration
-typedef struct {
-    uint8_t sclk_freq; // SCLK frequency 
-    uint8_t ms_mode; // Master/Slave mode 
-    uint8_t sclk_inv; // SCLK inversion 
-    uint8_t dlen; // Data length 
-    uint8_t i2s_mode; // I2S mode   
-    uint8_t lr_align; // LR alignment 
-    uint8_t lr_pol; // LR polarity  
-} i2s_config_t;
-
-// Configuration Structure for SGTL5000
-typedef struct {
-    audio_source_t audio_source; // Source of audio input
-    audio_output_t audio_output; // Destination of audio output
-    bool dsp_enable; // Enable Digital Signal Processing
-    uint32_t sys_mclk; // System Master Clock frequency in MHz
-    uint32_t sys_fs; // System Sampling Frequency in Hz
-    i2s_config_t *i2s_config; // I2S configuration
-    uint8_t volume; // Volume level
-} sgtl5000_config_t;
-
-
-
 // Function Prototypes
 
 // SGTL5000 Register Operations
@@ -235,11 +197,5 @@ uint8_t  sgtl5000_reg_modify_verify(uint16_t reg, uint16_t mask, uint8_t shift, 
 // SGTL5000 Initializaition and Confgiuration
 uint8_t  sgtl5000_read_id();
 uint8_t  sgtl5000_print_all_regs();
-uint8_t  sgtl5000_powerup();
-uint8_t  sgtl5000_clock_config();
-uint8_t  sgtl5000_input_output_route(audio_source_t source, audio_output_t output, bool dsp_enable);
-uint8_t  sgtl5000_configure_i2s(i2s_config_t* i2s_config_t);
-uint8_t  sgtl5000_adjust_volume(uint8_t volume, audio_output_t output, bool init);
-uint8_t  sgtl5000_configure_dsp();
-uint8_t  sgtl5000_init(sgtl5000_config_t* config);
+uint8_t  sgtl5000_init();
 #endif

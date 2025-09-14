@@ -144,437 +144,118 @@ uint8_t  sgtl5000_print_all_regs()
     return I2C_SUCCESS;
 }
 
+// Helper functions for initialization steps
+
 /**
- * @brief Power up the SGTL5000 audio codec
- * 
+ * @brief Power up the analog blocks of SGTL5000 audio codec
+ * @return I2C_SUCCESS on success, I2C_FAIL on failure
  */
-uint8_t sgtl5000_powerup()
-{   
+uint8_t sgtl5000_powerup_analog()
+{
     uint8_t status;
+
     // Turn of startup power supplies (VDDD is externally driven)
-    status = sgtl5000_reg_write_verify(SGTL5000_CHIP_ANA_POWER, 0X4260);
-    if (status != I2C_SUCCESS) {
-        printf("FAIL: Failed to turn off startup power supplies\r\n");
-        printf("Error code: %d\r\n", status);
-        return status; // Return if write failed
-    }
-
-    // Reference voltage and bias current configuration
-    // VDDA = 1.8V, VDDA / 2 = 0.9V
-    status = sgtl5000_reg_write_verify(SGTL5000_CHIP_REF_CTRL, 0x004E); // Set bias current
-    if (status != I2C_SUCCESS) {
-        printf("FAIL: Failed to set bias current\r\n");
-        printf("Error code: %d\r\n", status);
-        return status; // Return if write failed
-    }
-    status = sgtl5000_reg_write_verify(SGTL5000_CHIP_LINE_OUT_CTRL, 0x031E); // Set lineout reference voltage to VDDIO / 2 (1.65V)
-    if (status != I2C_SUCCESS) {
-        printf("FAIL: Failed to set reference voltage\r\n");
-        printf("Error code: %d\r\n", status);
-        return status; // Return if write failed
-    }
-
-    // Other analog block configurations
-    status = sgtl5000_reg_write_verify(SGTL5000_CHIP_REF_CTRL, 0x0041); // Configure slow ramp up rate
-    if (status != I2C_SUCCESS) {
-        printf("FAIL: Failed to configure slow ramp up rate\r\n");
-        printf("Error code: %d\r\n", status);
-        return status; // Return if write failed
-    }
-
-    // I2S clocks might not be present so enable internal oscillator
-    status = sgtl5000_reg_write_verify(SGTL5000_CHIP_CLK_TOP_CTRL, 0x0800); // Enable internal oscillator, 
-    if (status != I2C_SUCCESS) {
-        printf("FAIL: Failed to enable internal oscillator\r\n");
-        printf("Error code: %d\r\n", status);
-        return status; // Return if write failed
-    }
-
-    // Disable/clear short detect while we power analog
-    status = sgtl5000_reg_write_verify(SGTL5000_CHIP_SHORT_CTRL, 0x5508);
-    if (status != I2C_SUCCESS) return status;
-
-    HAL_Delay(100); // Let bias settle
-
-    // Power up Inputs/Outputs/Digital Blocks
-    status = sgtl5000_reg_write_verify(SGTL5000_CHIP_ANA_POWER, 0x40FB);
-    if (status != I2C_SUCCESS) return status;
-
-    HAL_Delay(100); // allow VAG/HP/LO to settle
-
-    // NOW re-enable LR short detect
-    status = sgtl5000_reg_write_verify(SGTL5000_CHIP_SHORT_CTRL, 0x1104);
-    if (status != I2C_SUCCESS) return status;
-
-    // Power up digital blocks
-    // I2S_IN (bit 0), I2S_OUT (bit 1), DAP (bit 4), DAC (bit 5), // ADC (bit 6) are powered on
-    status = sgtl5000_reg_write_verify(SGTL5000_CHIP_DIG_POWER, 0x0073);
-    if (status != I2C_SUCCESS) {
-        printf("FAIL: Failed to power up digital blocks\r\n");
-        printf("Error code: %d\r\n", status);
-        return status; // Return if write failed
-    }
-
-    // Set LINEOUT volume level
-    status = sgtl5000_reg_write_verify(SGTL5000_CHIP_LINE_OUT_VOL, 0x0606);
-    if (status != I2C_SUCCESS) {
-        printf("FAIL: Failed to set LINEOUT volume level\r\n");
-        printf("Error code: %d\r\n", status);
-        return status; // Return if write failed
-    }
-
-    return I2C_SUCCESS; 
-}
-
-/**
- * @brief Configure the clock settings of SGTL5000 audio codec
- */
-uint8_t sgtl5000_clock_config()
-{
-    uint8_t status;
-    // Set SYS_FS (bits 3:2) to 0x2 (48kHz), 
-    status = sgtl5000_reg_modify_verify(SGTL5000_CHIP_CLK_CTRL, CHIP_CLK_CTRL_SYS_FS_MASK,  CHIP_CLK_CTRL_SYS_FS_SHIFT, CHIP_CLK_CTRL_SYS_FS_48K);
-    if (status != I2C_SUCCESS) {
-        printf("FAIL: Failed to set SYS_FS to 48kHz\r\n");
-        printf("Error code: %d\r\n", status);
-        return status; // Return if write failed
-    }
-
-    // Set MCLK_FREQ (bits 1:0) to  0x0 (256*Fs)
-    status = sgtl5000_reg_modify_verify(SGTL5000_CHIP_CLK_CTRL, CHIP_CLK_CTRL_MCLK_FREQ_MASK, CHIP_CLK_CTRL_MCLK_FREQ_SHIFT, CHIP_CLK_CTRL_MCLK_256FS);
-    if (status != I2C_SUCCESS) {
-        printf("FAIL: Failed to set MCLK_FREQ to 256*Fs\r\n");
-        printf("Error code: %d\r\n", status);
-        return status; // Return if write failed
-    }
-    
-    return I2C_SUCCESS;
-}
-
-
-
-
-uint8_t  sgtl5000_configure_dsp()
-{
-    // Enable DSP
-    uint8_t status = sgtl5000_reg_modify(SGTL5000_DAP_CTRL, DAP_CTRL_DAP_EN_MASK, DAP_CTRL_DAP_EN_SHIFT, DAP_CTRL_DAP_EN);
-    if (status != I2C_SUCCESS) {
-        printf("FAIL: Failed to enable DSP\r\n");
-        printf("Error code: %d\r\n", status);
-        return status; // Return if write failed
-    }
-    // .. Add more stuff here later
-    return I2C_SUCCESS;
-}
-
-/**
- * @brief Configure the input and output routing of SGTL5000 audio codec
- * 
- * @param source Audio source to route (LINEIN or I2S)
- * @param output Audio output to route (LINEOUT, HP, or BOTH)
- * @param dsp_enable Enable or disable DSP processing
- */
-uint8_t sgtl5000_input_output_route(audio_source_t source, audio_output_t output, bool dsp_enable)
-{
-    uint8_t status = I2C_SUCCESS;
-
-    if (dsp_enable) {
-        // DAP will be enabled in the init function before the routing is performed 
-
-        // Choose audio source for DSP processing
-        if (source == AUDIO_SOURCE_I2S) {
-            // I2S -> DAP
-            status |= sgtl5000_reg_modify_verify(SGTL5000_CHIP_SSS_CTRL, SSS_CTRL_DAP_SEL_MASK, SSS_CTRL_DAP_SEL_SHIFT, SSS_CTRL_DAP_SEL_I2S);
-            // DAP -> DAC
-            status |= sgtl5000_reg_modify_verify(SGTL5000_CHIP_SSS_CTRL, SSS_CTRL_DAC_SEL_MASK, SSS_CTRL_DAC_SEL_SHIFT, SSS_CTRL_DAC_SEL_DAP);
-        }
-        else if (source == AUDIO_SOURCE_LINEIN) {
-            // LINEIN -> ADC
-            status |= sgtl5000_reg_modify_verify(SGTL5000_CHIP_ANA_CTRL, CHIP_ANA_CTRL_ADC_SEL_MASK,
-                                            CHIP_ANA_CTRL_ADC_SEL_SHIFT, CHIP_ANA_CTRL_ADC_SEL_LINEIN);
-            // ADC -> DAP
-            status |= sgtl5000_reg_modify_verify(SGTL5000_CHIP_SSS_CTRL, SSS_CTRL_DAP_SEL_MASK, 
-                                            SSS_CTRL_DAP_SEL_SHIFT, SSS_CTRL_DAP_SEL_ADC);
-            // DAP -> DAC
-            status |= sgtl5000_reg_modify_verify(SGTL5000_CHIP_SSS_CTRL, SSS_CTRL_DAC_SEL_MASK, 
-                                            SSS_CTRL_DAC_SEL_SHIFT, SSS_CTRL_DAC_SEL_DAP);
-            // Unmute ADC
-            status |= sgtl5000_reg_modify_verify(SGTL5000_CHIP_ANA_CTRL, CHIP_ANA_CTRL_ADC_MUTE_MASK, 
-                CHIP_ANA_CTRL_ADC_MUTE_SHIFT, CHIP_ANA_CTRL_ADC_MUTE_OFF);
-        }
-        // Choose audio output for the DAC
-        if (output == AUDIO_OUTPUT_HP) {
-            // DAC -> HP
-            status |= sgtl5000_reg_modify_verify(SGTL5000_CHIP_ANA_CTRL, CHIP_ANA_CTRL_HP_SEL_MASK, 
-                                            CHIP_ANA_CTRL_HP_SEL_SHIFT, CHIP_ANA_CTRL_HP_SEL_DAC);
-        }
-        else if (output == AUDIO_OUTPUT_LINEOUT) {  
-            ; // LINEOUT is always connected to DAC
-        }
-        else if (output == AUDIO_OUTPUT_BOTH) {
-            // DAC -> HP
-            status |= sgtl5000_reg_modify_verify(SGTL5000_CHIP_ANA_CTRL, CHIP_ANA_CTRL_HP_SEL_MASK, 
-                                            CHIP_ANA_CTRL_HP_SEL_SHIFT, CHIP_ANA_CTRL_HP_SEL_DAC);
-        }
-    }
-    else {
-        if (source == AUDIO_SOURCE_LINEIN && output == AUDIO_OUTPUT_HP) {
-            // If LINEIN -> HP, route LINEIN directly to HP
-            status |= sgtl5000_reg_modify_verify(SGTL5000_CHIP_ANA_CTRL, CHIP_ANA_CTRL_HP_SEL_MASK, 
-                                            CHIP_ANA_CTRL_HP_SEL_SHIFT, CHIP_ANA_CTRL_HP_SEL_LINEIN);
-        }
-        else {
-            // Choose audio source for direct output
-            if (source == AUDIO_SOURCE_I2S) {
-                // I2S -> DAC
-                status |= sgtl5000_reg_modify_verify(SGTL5000_CHIP_SSS_CTRL, SSS_CTRL_DAC_SEL_MASK, 
-                                                SSS_CTRL_DAC_SEL_SHIFT, SSS_CTRL_DAC_SEL_I2S);
-            }
-            else if (source == AUDIO_SOURCE_LINEIN) {
-                // LINEIN -> ADC
-                status |= sgtl5000_reg_modify_verify(SGTL5000_CHIP_ANA_CTRL, CHIP_ANA_CTRL_ADC_SEL_MASK, 
-                                                CHIP_ANA_CTRL_ADC_SEL_SHIFT, CHIP_ANA_CTRL_ADC_SEL_LINEIN);
-                
-                // ADC -> DAC
-                status |= sgtl5000_reg_modify_verify(SGTL5000_CHIP_SSS_CTRL, SSS_CTRL_DAC_SEL_MASK, 
-                                                SSS_CTRL_DAC_SEL_SHIFT, SSS_CTRL_DAC_SEL_ADC);
-
-                // Unmute ADC
-                status |= sgtl5000_reg_modify_verify(SGTL5000_CHIP_ANA_CTRL, CHIP_ANA_CTRL_ADC_MUTE_MASK, 
-                    CHIP_ANA_CTRL_ADC_MUTE_SHIFT, CHIP_ANA_CTRL_ADC_MUTE_OFF);
-            }
-            // Choose audio output for the DAC
-            if (output == AUDIO_OUTPUT_LINEOUT) {
-                ; // LINEOUT is always connected to DAC 
-            }
-            else if (output == AUDIO_OUTPUT_HP) {
-                // DAC -> HP
-                status |= sgtl5000_reg_modify_verify(SGTL5000_CHIP_ANA_CTRL, CHIP_ANA_CTRL_HP_SEL_MASK, 
-                                                CHIP_ANA_CTRL_HP_SEL_SHIFT, CHIP_ANA_CTRL_HP_SEL_DAC);
-            }
-            else if (output == AUDIO_OUTPUT_BOTH) {
-                // DAC -> HP
-                status |= sgtl5000_reg_modify_verify(SGTL5000_CHIP_ANA_CTRL, CHIP_ANA_CTRL_HP_SEL_MASK, 
-                                                CHIP_ANA_CTRL_HP_SEL_SHIFT, CHIP_ANA_CTRL_HP_SEL_DAC);
-            }
-        }  
-    }
-
-
-    // Start the DAC volume ramp engine and re-assert target
-    status |= sgtl5000_reg_write(SGTL5000_CHIP_ADCDAC_CTRL, 0x0200);   // VOL_RAMP_EN=1, mutes=0, RSVD=0
-    status |= sgtl5000_reg_write(SGTL5000_CHIP_DAC_VOL,      0x3C3C);   // 0 dB target for the ramp
-
-    // Optional: wait briefly for VOL_BUSY to clear
-    uint16_t adcdac;
-    bool busy_cleared = false;
-    for (int i = 0; i < 50; i++) {      // up to ~100 ms
-        sgtl5000_reg_read(SGTL5000_CHIP_ADCDAC_CTRL, &adcdac);
-        if ((adcdac & 0x3000) == 0) {
-            busy_cleared = true;
-            break;  // both VOL_BUSY flags cleared
-        }
-        printf("Waiting for VOL_BUSY to clear...\r\n");
-        HAL_Delay(2);
-    }
-
-    if (!busy_cleared) {
-        printf("VOL_BUSY did not clear in time\r\n");
-    }
-    return status;
-}
-
-/**
- * @brief Configure the I2S interface of SGTL5000 audio codec
- * 
- * @param i2s_config Pointer to I2S configuration structure. If NULL, default settings will be used.
- */
-uint8_t  sgtl5000_configure_i2s(i2s_config_t* i2s_config)
-{   
-    uint8_t status;
-    // Use default I2S configuration if i2s_config is NULL
-    if (i2s_config == NULL) {
-        //SCLKFREQ=64Fs, MS=Slave, SCLK_INV=0, DLEN=16, I2S mode via LRALIGN=0, LRPOL=0
-        status = sgtl5000_reg_write_verify(SGTL5000_CHIP_I2S_CTRL, CHIP_I2S_CTRL_DEFAULT);
-        
-    }
-    else {
-        uint16_t i2s_ctrl_cfg_mask = i2s_config -> sclk_freq << 8 | 
-                                     (i2s_config -> ms_mode << 7) |
-                                     (i2s_config -> sclk_inv << 6) |
-                                     (i2s_config -> dlen << 4) |
-                                     (i2s_config -> i2s_mode << 2) |
-                                     (i2s_config -> lr_align << 1) |
-                                     i2s_config -> lr_pol;
-
-        status = sgtl5000_reg_write_verify(SGTL5000_CHIP_I2S_CTRL, i2s_ctrl_cfg_mask);
-    } 
-    return status; 
-}
-
-/**
- * @brief Adjust the volume of SGTL5000 audio codec
- * @param volume Volume level to set (0-255)
- * @param output Audio output type (LINEOUT, HP, BOTH)
- * @param init Initialization flag
- */
-uint8_t  sgtl5000_adjust_volume(uint8_t volume, audio_output_t output, bool init)
-{
-    uint8_t status = I2C_SUCCESS;
-    uint16_t ana_ctrl = 0;
-
-    // Read current analog rouiting to know if HP is fed from DAC or LINEIN (bypass)
-    status |= sgtl5000_reg_read(SGTL5000_CHIP_ANA_CTRL, &ana_ctrl);
-    if (status != I2C_SUCCESS) {
-        return status; // Return if read operation failed
-    }
-    uint8_t hp_sel = (ana_ctrl & CHIP_ANA_CTRL_HP_SEL_MASK) >> CHIP_ANA_CTRL_HP_SEL_SHIFT;
-    bool hp_from_dac = (hp_sel == CHIP_ANA_CTRL_HP_SEL_DAC);
-
-
-    // Volume and Mute Control
-    if (output == AUDIO_OUTPUT_HP || output == AUDIO_OUTPUT_BOTH) {
-        if (init) {
-            // Configure HP_OUT left and right volume to minimum , unmute
-            status |= sgtl5000_reg_write_verify(SGTL5000_CHIP_ANA_HP_CTRL, 0x7F7F);
-            status |= sgtl5000_reg_modify_verify(SGTL5000_CHIP_ANA_CTRL, CHIP_ANA_CTRL_HP_MUTE_MASK, 
-                CHIP_ANA_CTRL_HP_MUTE_SHIFT, CHIP_ANA_CTRL_HP_MUTE_OFF);
-
-            if (hp_from_dac) {
-                // Unmute DAC (HP may be switched to DAC in this call)
-                status |= sgtl5000_reg_write_verify(SGTL5000_CHIP_DAC_VOL, 0x3C3C); // 0 dB
-                status |= sgtl5000_reg_modify_verify(SGTL5000_CHIP_ADCDAC_CTRL,
-                                ADCDAC_CTRL_DAC_MUTE_MASK, ADCDAC_CTRL_DAC_MUTE_SHIFT, ADCDAC_CTRL_DAC_MUTE_OFF);
-            }
-        }
-
-        // Left and Right volumes are assumed to be the same
-        uint8_t cur_vol_left;
-        if (init) {
-            cur_vol_left = HP_VOL_MIN; // 0x7F
-        }
-        else {
-            // Read current HP volume
-            uint16_t cur_vol;
-            status |= sgtl5000_reg_read(SGTL5000_CHIP_ANA_HP_CTRL, &cur_vol);
-            if (status != I2C_SUCCESS) {
-                return status; // Return if read operation failed
-            }
-            cur_vol_left = (cur_vol >> 8) & 0xFF; // Extract left channel volume
-        }
-        uint8_t new_vol_left = (volume > HP_VOL_MIN) ? HP_VOL_MIN : volume; // Clamp the volume to 0x7F
-        uint8_t num_steps = abs(new_vol_left - cur_vol_left);
-        uint16_t cur_vol;
-
-        // Gradual change
-        for (uint8_t i = 0; i < num_steps; i++) {
-            if (new_vol_left > cur_vol_left) {
-                cur_vol_left++;
-            } else {
-                cur_vol_left--;
-            }
-
-            cur_vol = (cur_vol_left << 8) | cur_vol_left; // Combine left and right volumes
-            // Write the new volume to both left and right channels
-            status |= sgtl5000_reg_write_verify(SGTL5000_CHIP_ANA_HP_CTRL, cur_vol);
-        }
-    }
-
-    
-
-    // LINEOUT and DAC volume control
-    if (output == AUDIO_OUTPUT_LINEOUT || output == AUDIO_OUTPUT_BOTH) {
-        // Unmute LINEOUT
-        status |= sgtl5000_reg_modify(SGTL5000_CHIP_ANA_CTRL, CHIP_ANA_CTRL_LINOUT_MUTE_MASK, 
-            CHIP_ANA_CTRL_LINOUT_MUTE_SHIFT, CHIP_ANA_CTRL_LINOUT_MUTE_OFF);
-        
-        // Unmute DAC
-        status |= sgtl5000_reg_write(SGTL5000_CHIP_DAC_VOL, 0x3C3C); // 0dB
-        status |= sgtl5000_reg_modify(SGTL5000_CHIP_ADCDAC_CTRL, ADCDAC_CTRL_DAC_MUTE_MASK, 
-            ADCDAC_CTRL_DAC_MUTE_SHIFT, ADCDAC_CTRL_DAC_MUTE_OFF);
-    }
-
-    return status;
-}
-
-
-
-/**
- * @brief Initialize the SGTL5000 audio codec with the provided configuration
- * 
- * @param config Pointer to the SGTL5000 configuration structure
- */
-uint8_t  sgtl5000_init(sgtl5000_config_t* config)
-{
-    
-    uint8_t status;
-    // Changed
     status = sgtl5000_reg_write_verify(SGTL5000_CHIP_ANA_POWER, 0x4060);
     if (status != I2C_SUCCESS) {
         printf("Failed to write to SGTL5000_CHIP_ANA_POWER 1\r\n");
         return status;
     }
 
-    // Skipped LINREG CTRL
-
-    // Changed for VAG_VAL = 0.9V
-    status = sgtl5000_reg_write_verify(SGTL5000_CHIP_REF_CTRL, 0x004E);
+    // Configure reference voltage and bias current
+    status = sgtl5000_reg_write_verify(SGTL5000_CHIP_REF_CTRL, 0x004E); // Set bias current
     if (status != I2C_SUCCESS) {
         printf("Failed to write to SGTL5000_CHIP_REF_CTRL 2\r\n");
         return status;
     }
 
-    status = sgtl5000_reg_write_verify(SGTL5000_CHIP_LINE_OUT_CTRL, 0x0F22);
+    status = sgtl5000_reg_write_verify(SGTL5000_CHIP_LINE_OUT_CTRL, 0x0F22); // Set lineout reference voltage to VDDIO / 2 (1.65V)
     if (status != I2C_SUCCESS) {
         printf("Failed to write to SGTL5000_CHIP_LINE_OUT_CTRL 3\r\n");
         return status;
     }
 
+    // Short detect configuration
     status = sgtl5000_reg_write_verify(SGTL5000_CHIP_SHORT_CTRL, 0x1106);
     if (status != I2C_SUCCESS) {
         printf("Failed to write to SGTL5000_CHIP_SHORT_CTRL 4\r\n");
         return status;
     }
-    // Changed
+
+    // Final analog power up after limits are set
     status = sgtl5000_reg_write_verify(SGTL5000_CHIP_ANA_POWER, 0x40FB);
     if (status != I2C_SUCCESS) {
         printf("Failed to write to SGTL5000_CHIP_ANA_POWER 5\r\n");
         return status;
     }
 
-    status = sgtl5000_reg_write_verify(SGTL5000_CHIP_DIG_POWER, 0x0073);
+    return I2C_SUCCESS;
+}
+
+/**
+ * @brief Power up the digital blocks of SGTL5000 audio codec
+ * @return I2C_SUCCESS on success, I2C_FAIL on failure
+ */
+uint8_t sgtl5000_powerup_digital()
+{
+    uint8_t status = sgtl5000_reg_write_verify(SGTL5000_CHIP_DIG_POWER, 0x0073);
     if (status != I2C_SUCCESS) {
         printf("Failed to write to SGTL5000_CHIP_DIG_POWER 6\r\n");
         return status;
     }
+    return I2C_SUCCESS;
+}
 
-    // Changed for VAG_VAL = 0.9V VDDA = 1.8V
-    status = sgtl5000_reg_write_verify(SGTL5000_CHIP_LINE_OUT_VOL, 0x0606);
-    if (status != I2C_SUCCESS) {
-        printf("Failed to write to SGTL5000_CHIP_LINE_OUT_VOL 7\r\n");
-        return status;
-    }
-
-    // Changed fro 12.288Mhz MCLK
-    status = sgtl5000_reg_write_verify(SGTL5000_CHIP_CLK_CTRL, 0x0008);
+/**
+ * @brief Configure the clocks of SGTL5000 audio codec
+ * @return I2C_SUCCESS on success, I2C_FAIL on failure
+ */
+uint8_t sgtl5000_configure_clocks()
+{
+    // MCLK = 12.288MHz, Fs = 48kHz
+    uint8_t status = sgtl5000_reg_write_verify(SGTL5000_CHIP_CLK_CTRL, 0x0008);
     if (status != I2C_SUCCESS) {
         printf("Failed to write to SGTL5000_CHIP_CLK_CTRL 8\r\n");
         return status;
     }
+    return I2C_SUCCESS;
+}
 
-    // Need to change this later for different I2S
-    status = sgtl5000_reg_write_verify(SGTL5000_CHIP_I2S_CTRL, 0X0080);
+/**
+ * @brief Configure the I2S interface of SGTL5000 audio codec
+ * @return I2C_SUCCESS on success, I2C_FAIL on failure
+ */
+uint8_t sgtl5000_configure_i2s()
+{
+    // SCLKFREQ=64Fs, MS=Slave, SCLK_INV=0, DLEN=16, I2S mode via LRALIGN=0, LRPOL=0
+    uint8_t status = sgtl5000_reg_write_verify(SGTL5000_CHIP_I2S_CTRL, 0X0800);
     if (status != I2C_SUCCESS) {
         printf("Failed to write to SGTL5000_CHIP_I2S_CTRL 9\r\n");
         return status;
     }
+    return I2C_SUCCESS;
+}
 
-    status = sgtl5000_reg_write_verify(SGTL5000_CHIP_SSS_CTRL, 0x0030);
+/**
+ * @brief Configure the routing of SGTL5000 audio codec
+ * @return I2C_SUCCESS on success, I2C_FAIL on failure
+ */
+uint8_t sgtl5000_configure_routing()
+{
+    uint8_t status = sgtl5000_reg_write_verify(SGTL5000_CHIP_SSS_CTRL, 0x0030);
     if (status != I2C_SUCCESS) {
         printf("Failed to write to SGTL5000_CHIP_SSS_CTRL 10\r\n");
         return status;
     }
+    return I2C_SUCCESS;
+}
 
+/**
+ * @brief Configure the DSP of SGTL5000 audio codec
+ * @return I2C_SUCCESS on success, I2C_FAIL on failure
+ */
+uint8_t sgtl5000_configure_dsp()
+{
+    uint8_t status;
     status = sgtl5000_reg_write_verify(SGTL5000_DAP_CTRL, 0x0001);
     if (status != I2C_SUCCESS) {
         printf("Failed to write to SGTL5000_DAP_CTRL 11\r\n");
@@ -606,11 +287,18 @@ uint8_t  sgtl5000_init(sgtl5000_config_t* config)
     }
     HAL_Delay(50);
     status = sgtl5000_reg_write_verify(SGTL5000_DAP_AVC_CTRL, 0x0001);
-    if (status != I2C_SUCCESS) {
-        printf("Failed to write to SGTL5000_DAP_AVC_CTRL 16\r\n");
-        //return status;
-    }
+    
     HAL_Delay(50);
+    return I2C_SUCCESS;
+}
+
+/**
+ * @brief Set initial volume and levels of SGTL5000 audio codec
+ * @return I2C_SUCCESS on success, I2C_FAIL on failure
+ */
+uint8_t sgtl5000_set_levels()
+{
+    uint8_t status;
     status = sgtl5000_reg_write_verify(SGTL5000_CHIP_ANA_ADC_CTRL, 0x0000);
     if (status != I2C_SUCCESS) {
         printf("Failed to write to SGTL5000_CHIP_ANA_ADC_CTRL 17\r\n");
@@ -644,6 +332,67 @@ uint8_t  sgtl5000_init(sgtl5000_config_t* config)
     status = sgtl5000_reg_write_verify(SGTL5000_CHIP_ANA_CTRL, 0x0004);
     if (status != I2C_SUCCESS) {
         printf("Failed to write to SGTL5000_CHIP_ANA_CTRL 22\r\n");
+        return status;
+    }
+
+    return I2C_SUCCESS;
+}
+
+/**
+ * @brief Initialize the SGTL5000 audio codec with the provided configuration
+ * 
+ * @param config Pointer to the SGTL5000 configuration structure
+ */
+uint8_t  sgtl5000_init()
+{
+    uint8_t status;
+    
+    // Analog Power Up
+    status = sgtl5000_powerup_analog();
+    if (status != I2C_SUCCESS) {
+        printf("Failed to power up analog blocks\r\n");
+        return status;
+    }
+    // Digital Power Up
+    status = sgtl5000_powerup_digital();
+    if (status != I2C_SUCCESS) {
+        printf("Failed to power up digital blocks\r\n");
+        return status;
+    }
+    // Start LINEOUT volume at 0dB
+    status = sgtl5000_reg_write_verify(SGTL5000_CHIP_LINE_OUT_VOL, 0x0606);
+    if (status != I2C_SUCCESS) {
+        printf("Failed to write to SGTL5000_CHIP_LINE_OUT_VOL 7\r\n");
+        return status;
+    }
+    // Clock Configuration
+    status = sgtl5000_configure_clocks();
+    if (status != I2C_SUCCESS) {
+        printf("Failed to configure clocks\r\n");
+        return status;
+    }
+    // I2S Configuration
+    status = sgtl5000_configure_i2s();
+    if (status != I2C_SUCCESS) {
+        printf("Failed to configure I2S\r\n");
+        return status;
+    }
+    // Routing Configuration
+    status = sgtl5000_configure_routing();
+    if (status != I2C_SUCCESS) {
+        printf("Failed to configure routing\r\n");
+        return status;
+    }
+    // DSP Configuration
+    status = sgtl5000_configure_dsp();
+    if (status != I2C_SUCCESS) {
+        printf("Failed to configure DSP\r\n");
+        return status;
+    }
+    // Set initial levels
+    status = sgtl5000_set_levels();
+    if (status != I2C_SUCCESS) {
+        printf("Failed to set initial levels\r\n");
         return status;
     }
 
