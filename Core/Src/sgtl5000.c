@@ -250,6 +250,31 @@ uint8_t sgtl5000_configure_routing()
 }
 
 /**
+ * @brief Change the volume of SGTL5000 audio code
+ * @param volume_percent Volume percentage (0-100)
+ * @return I2C_SUCCESS on success, I2C_FAIL on failure
+ */
+uint8_t sgtl5000_change_dac_volume(uint8_t volume_percent)
+{
+    if (volume_percent > 100) {
+        volume_percent = 100; // Clamp to 100%
+    }
+
+    // 0% -> 0xFC (min)
+    // 100% -> 0x00 (max)
+    int32_t volume_span = DAC_VOL_MAX - DAC_VOL_MIN; // Negative
+    int32_t volume_value = DAC_VOL_MIN + (volume_span * volume_percent) / 100;
+    uint16_t lr_volume = (uint16_t)(((uint16_t)volume_value << 8) | (uint16_t)volume_value);
+    uint8_t status = sgtl5000_reg_write_verify(SGTL5000_CHIP_DAC_VOL, lr_volume);
+    if (status != I2C_SUCCESS) {
+        printf("Failed to write to SGTL5000_CHIP_DAC_VOL\r\n");
+        return status;
+    }
+
+    return I2C_SUCCESS;
+}
+
+/**
  * @brief Mute or unmute the DAC output of SGTL5000 audio codec
  * @param on true to mute, false to unmute
  */

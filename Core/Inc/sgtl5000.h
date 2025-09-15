@@ -5,6 +5,7 @@
 #include "stdint.h"
 #include "stdbool.h"
 
+
 // Success & Fail
 #define I2C_SUCCESS 0
 #define I2C_FAIL 1
@@ -16,6 +17,8 @@
 // Volume
 #define HP_VOL_MIN 0x7F
 #define HP_VOL_MAX 0x00 // +12dB
+#define DAC_VOL_MIN 0XFC
+#define DAC_VOL_MAX 0x00 // 0dB
 
 // I2S
 #define I2S_USE_DEFAULT 0xFF
@@ -204,6 +207,7 @@ uint8_t  sgtl5000_read_id();
 uint8_t  sgtl5000_print_all_regs();
 uint8_t  sgtl5000_init();
 
+uint8_t sgtl5000_change_dac_volume(uint8_t volume_percent);
 uint8_t sgtl5000_dac_mute(bool mute);
 uint8_t sgtl5000_dap_surround_set(sgtl_surround_mode_t mode, uint8_t width);
 uint8_t sgtl5000_dap_bass_enhance_set(bool enable, uint8_t lr_level, uint8_t bass_level);
