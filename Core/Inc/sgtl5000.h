@@ -17,6 +17,9 @@
 #define HP_VOL_MIN 0x7F
 #define HP_VOL_MAX 0x00 // +12dB
 
+// I2S
+#define I2S_USE_DEFAULT 0xFF
+
 // Register Address
 #define SGTL5000_CHIP_ID				0x0000
 #define SGTL5000_CHIP_DIG_POWER			0x0002
@@ -49,11 +52,11 @@
 #define SGTL5000_DAP_FLT_COEF_ACCESS	0x010C
 #define SGTL5000_DAP_COEF_WR_B0_MSB		0x010E
 #define SGTL5000_DAP_COEF_WR_B0_LSB		0x0110
-#define SGTL5000_DAP_EQ_BASS_BAND0		0x0116
-#define SGTL5000_DAP_EQ_BASS_BAND1		0x0118
-#define SGTL5000_DAP_EQ_BASS_BAND2		0x011A
-#define SGTL5000_DAP_EQ_BASS_BAND3		0x011C
-#define SGTL5000_DAP_EQ_BASS_BAND4		0x011E
+#define SGTL5000_DAP_EQ_BAND0		    0x0116
+#define SGTL5000_DAP_EQ_BAND1		    0x0118
+#define SGTL5000_DAP_EQ_BAND2		    0x011A
+#define SGTL5000_DAP_EQ_BAND3		    0x011C
+#define SGTL5000_DAP_EQ_BAND4		    0x011E
 #define SGTL5000_DAP_MAIN_CHAN			0x0120
 #define SGTL5000_DAP_MIX_CHAN			0x0122
 #define SGTL5000_DAP_AVC_CTRL			0x0124
@@ -180,45 +183,12 @@
 #define CHIP_CLK_TOP_CTRL_INPUT_FREQ_DIV2 0x1 // 0x1 = Divide input frequency by 2
 #define CHIP_CLK_TOP_CTRL_INPUT_FREQ_DIV1 0x0 // 0x0 = Do not divide input frequency
 
-
-
-
-// Audio Source Options
+// Surround Sound Modes
 typedef enum {
-    AUDIO_SOURCE_LINEIN = 0,
-    AUDIO_SOURCE_I2S
-} audio_source_t;
-
-// Audio Output Options
-typedef enum {
-    AUDIO_OUTPUT_LINEOUT = 0,
-    AUDIO_OUTPUT_HP,
-    AUDIO_OUTPUT_BOTH, // Both Lineout and HP
-} audio_output_t;
-
-// I2S Configuration
-typedef struct {
-    uint8_t sclk_freq; // SCLK frequency 
-    uint8_t ms_mode; // Master/Slave mode 
-    uint8_t sclk_inv; // SCLK inversion 
-    uint8_t dlen; // Data length 
-    uint8_t i2s_mode; // I2S mode   
-    uint8_t lr_align; // LR alignment 
-    uint8_t lr_pol; // LR polarity  
-} i2s_config_t;
-
-// Configuration Structure for SGTL5000
-typedef struct {
-    audio_source_t audio_source; // Source of audio input
-    audio_output_t audio_output; // Destination of audio output
-    bool dsp_enable; // Enable Digital Signal Processing
-    uint32_t sys_mclk; // System Master Clock frequency in MHz
-    uint32_t sys_fs; // System Sampling Frequency in Hz
-    i2s_config_t i2s_config; // I2S configuration
-    uint8_t volume; // Volume level
-} sgtl5000_config_t;
-
-
+  SGTL_SURROUND_OFF    = 0x0, // disabled
+  SGTL_SURROUND_MONO   = 0x2, // enable, mono input
+  SGTL_SURROUND_STEREO = 0x3  // enable, stereo input
+} sgtl_surround_mode_t;
 
 // Function Prototypes
 
@@ -230,11 +200,12 @@ uint8_t  sgtl5000_reg_modify(uint16_t reg, uint16_t mask, uint8_t shift, uint16_
 uint8_t  sgtl5000_reg_modify_verify(uint16_t reg, uint16_t mask, uint8_t shift, uint16_t value);
 
 // SGTL5000 Initializaition and Confgiuration
-uint8_t  sgtl5000_powerup();
-uint8_t  sgtl5000_clock_config();
-uint8_t  sgtl5000_input_output_route(audio_source_t source, audio_output_t output, bool dsp_enable);
-uint8_t  sgtl5000_configure_i2s(i2s_config_t* i2s_config_t);
-uint8_t  sgtl5000_adjust_volume(uint8_t volume, audio_output_t output, bool init);
-uint8_t  sgtl5000_configure_dsp();
-uint8_t  sgtl5000_init(sgtl5000_config_t* config);
+uint8_t  sgtl5000_read_id();
+uint8_t  sgtl5000_print_all_regs();
+uint8_t  sgtl5000_init();
+
+uint8_t sgtl5000_dac_mute(bool mute);
+uint8_t sgtl5000_dap_surround_set(sgtl_surround_mode_t mode, uint8_t width);
+uint8_t sgtl5000_dap_bass_enhance_set(bool enable, uint8_t lr_level, uint8_t bass_level);
+uint8_t sgtl5000_dap_geq_set_bands_db(int8_t b0_db, int8_t b1_db, int8_t b2_db, int8_t b3_db, int8_t b4_db);
 #endif
