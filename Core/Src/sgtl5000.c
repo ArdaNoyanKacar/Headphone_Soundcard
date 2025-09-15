@@ -227,7 +227,7 @@ uint8_t sgtl5000_configure_clocks()
 uint8_t sgtl5000_configure_i2s()
 {
     // SCLKFREQ=64Fs, MS=Slave, SCLK_INV=0, DLEN=16, I2S mode via LRALIGN=0, LRPOL=0
-    uint8_t status = sgtl5000_reg_write_verify(SGTL5000_CHIP_I2S_CTRL, 0X0800);
+    uint8_t status = sgtl5000_reg_write_verify(SGTL5000_CHIP_I2S_CTRL, 0X0080);
     if (status != I2C_SUCCESS) {
         printf("Failed to write to SGTL5000_CHIP_I2S_CTRL 9\r\n");
         return status;
@@ -248,6 +248,287 @@ uint8_t sgtl5000_configure_routing()
     }
     return I2C_SUCCESS;
 }
+
+/**
+ * @brief Mute or unmute the DAC output of SGTL5000 audio codec
+ * @param on true to mute, false to unmute
+ */
+uint8_t sgtl5000_dac_mute(bool mute)
+{
+    uint8_t status;
+    status = sgtl5000_reg_modify(SGTL5000_CHIP_ADCDAC_CTRL, ADCDAC_CTRL_DAC_MUTE_MASK, ADCDAC_CTRL_DAC_MUTE_SHIFT, mute ? ADCDAC_CTRL_DAC_MUTE_ON : ADCDAC_CTRL_DAC_MUTE_OFF);
+    if (status != I2C_SUCCESS) {
+        printf("Failed to modify SGTL5000_CHIP_ADCDAC_CTRL for DAC mute\r\n");
+    }
+    return status;
+}
+
+/**
+ * @brief Set the surround sound mode of SGTL5000 audio codec
+ * @param mode Surround sound mode (SGTL_SURROUND_OFF, SGTL_SURROUND_MONO, SGTL_SURROUND_STEREO)
+ * @param width Width of the surround eff   ect (0-7)
+ * @return I2C_SUCCESS on success, I2C_FAIL on failure
+ */
+uint8_t sgtl5000_dap_surround_set(sgtl_surround_mode_t mode, uint8_t width)
+{
+    if (width > 7) {
+        width = 7;  // Max width is 7
+    }
+    
+    sgtl5000_dac_mute(true); // Mute DAC during configuration
+    uint16_t surround_val = ((uint16_t)width << 4) | (mode & 0x3);
+    uint8_t status;
+    status = sgtl5000_reg_write_verify(SGTL5000_DAP_SURROUND, surround_val); // 0x010A
+    if (status != I2C_SUCCESS) {
+        printf("Failed to write to SGTL5000_DAP_SURROUND\r\n");
+        return status;
+    }
+    sgtl5000_dac_mute(false); // Unmute DAC after configuration
+    return I2C_SUCCESS;
+}
+
+/**
+ * @brief Enable or disable bass enhancement
+ * @param enable true to enable, false to disable
+ * @param bass_level Bass enhancement level (0-127, where 0 is max boost and 127 is min boost)
+ */
+uint8_t sgtl5000_dap_bass_enhance_set(bool enable, uint8_t lr_level, uint8_t bass_level)
+{
+    uint8_t status = I2C_SUCCESS;
+    if (bass_level > 0x7F) bass_level = 0x7F;  // clamp to field
+
+    sgtl5000_dac_mute(true); // Mute DAC during configuration
+
+    if (enable) {
+
+        // Adjust the LR value
+        status = sgtl5000_reg_modify_verify(SGTL5000_DAP_BASS_ENHANCE_CTRL, 0x3F00, 8, lr_level & 0x3F);
+        if (status != I2C_SUCCESS) {
+            printf("Failed to set LR level\r\n");
+            sgtl5000_dac_mute(false);
+            return status;
+        }
+
+        uint16_t ctrl16;
+        status = sgtl5000_reg_read(SGTL5000_DAP_BASS_ENHANCE_CTRL, &ctrl16);
+        if (status != I2C_SUCCESS) {
+            printf("Failed to read SGTL5000_DAP_BASS_ENHANCE_CTRL\r\n");
+            sgtl5000_dac_mute(false);
+            return status;
+        }
+
+        // current 7-bit BASS_LEVEL (0x00 = most boost, 0x7F = least)
+        uint8_t curr = (uint8_t)(ctrl16 & 0x007F);
+        uint8_t next = curr;
+
+        // ramp up to least boost (0x7F) BEFORE enabling
+        uint8_t steps = (uint8_t)(0x7F - curr);
+        for (uint8_t i = 0; i < steps; i++) {
+            next++;
+            status = sgtl5000_reg_modify_verify(SGTL5000_DAP_BASS_ENHANCE_CTRL, 0x007F, 0, next);
+            if (status != I2C_SUCCESS) { sgtl5000_dac_mute(false); return status; }
+        }
+
+        // enable (preserves cutoff/HPF/etc.)
+        status = sgtl5000_reg_modify_verify(SGTL5000_DAP_BASS_ENHANCE, 0x0001, 0, 1);
+        if (status != I2C_SUCCESS) {
+            printf("Failed to enable bass enhance\r\n"); 
+            sgtl5000_dac_mute(false); 
+            return status;
+        }
+
+        // ramp down from 0x7F to target (decreasing code = more boost)
+        next  = 0x7F;
+        steps = (uint8_t)(0x7F - bass_level);
+        for (uint8_t i = 0; i < steps; i++) {
+            next--;
+            status = sgtl5000_reg_modify_verify(SGTL5000_DAP_BASS_ENHANCE_CTRL, 0x007F, 0, next);
+            if (status != I2C_SUCCESS) {
+                printf("Failed to set bass level\r\n");
+                sgtl5000_dac_mute(false); 
+                return status; 
+            }
+        }
+    } else {
+        // disable, leave CTRL as-is
+        status = sgtl5000_reg_modify_verify(SGTL5000_DAP_BASS_ENHANCE, 0x0001, 0, 0);
+        if (status != I2C_SUCCESS) {
+            printf("Failed to disable bass enhance\r\n");
+            sgtl5000_dac_mute(false);
+            return status;
+        }
+    }
+
+    sgtl5000_dac_mute(false);
+    return status;
+}
+
+
+/**
+ * @brief Bypass the EQ of SGTL5000 audio codec
+ * @return I2C_SUCCESS on success, I2C_FAIL on failure
+ */
+uint8_t sgtl5000_dap_eq_bypass(void)
+{
+    sgtl5000_dac_mute(true); // Mute DAC during configuration
+    uint8_t status;
+    status = sgtl5000_reg_write_verify(SGTL5000_DAP_AUDIO_EQ, 0x0000); // Bypass EQ
+    if (status != I2C_SUCCESS) {
+        printf("Failed to write to SGTL5000_DAP_AUDIO_EQ for EQ bypass\r\n");
+    }
+    sgtl5000_dac_mute(false); // Unmute DAC after configuration
+    return I2C_SUCCESS;
+}
+
+uint8_t sgtl5000_dap_geq_enable(void)
+{
+    sgtl5000_dac_mute(true); // Mute DAC during configuration
+    uint8_t status;
+    status = sgtl5000_reg_write_verify(SGTL5000_DAP_AUDIO_EQ, 0x0003); // Enable EQ
+    if (status != I2C_SUCCESS) {
+        printf("Failed to write to SGTL5000_DAP_AUDIO_EQ for EQ enable\r\n");
+    }
+    sgtl5000_dac_mute(false); // Unmute DAC after configuration
+    return I2C_SUCCESS;
+}
+
+uint16_t sgtl5000_geq_code_from_db(int8_t db)
+{
+    // clamp to chip range (±12 dB)
+    if (db < -12) {
+         db = -12; 
+    }
+    if (db > +12) {
+         db = +12; 
+    }
+
+    int16_t code = 0x2F + (int16_t)db * 4;  // 0 dB = 0x2F; 1 dB = 4 steps
+    if (code < 0x00) {
+         code = 0x00; 
+    }
+    if (code > 0x5F) {
+         code = 0x5F; 
+    }
+    return (uint16_t)code;
+}
+
+
+
+uint8_t sgtl5000_dap_geq_ramp_band(uint16_t band_reg, uint16_t target)
+{
+    uint8_t  status;
+    uint16_t value;
+
+    status = sgtl5000_reg_read(band_reg, &value);
+    if (status != I2C_SUCCESS) { 
+        return status; 
+    }
+
+    uint16_t curr = value & 0x007F;
+    uint16_t goal = target;
+    if (goal > 0x5F) {
+         goal = 0x5F; 
+    } // Clamp to max
+
+    if (curr == goal) {
+         return I2C_SUCCESS;
+    }
+
+    uint16_t num_steps;
+    int8_t   dir;
+    if (goal > curr) {
+        num_steps = (uint16_t)(goal - curr);
+        dir   = +1;
+    } else {
+        num_steps = (uint16_t)(curr - goal);
+        dir   = -1;
+    }
+
+    uint16_t next = curr;
+    for (uint16_t i = 0; i < num_steps; i++) {
+        next = (uint16_t)(next + dir);
+        status = sgtl5000_reg_modify_verify(band_reg, 0x007F, 0, next);
+        if (status != I2C_SUCCESS) {
+             return status; 
+        }
+        HAL_Delay(1); // Small delay 
+    }
+    return I2C_SUCCESS;
+}
+
+
+
+/**
+ * @brief Set the GEQ bands of SGTL5000 audio codec
+ * @param b0_db Gain for Band 0 in dB (-12 to +12)
+ * @param b1_db Gain for Band 1 in dB (-12 to +12)
+ * @param b2_db Gain for Band 2 in dB (-12 to +12)
+ * @param b3_db Gain for Band 3 in dB (-12 to +12)
+ * @param b4_db Gain for Band 4 in dB (-12 to +12)
+ */
+uint8_t sgtl5000_dap_geq_set_bands_db(int8_t b0_db, int8_t b1_db, int8_t b2_db, int8_t b3_db, int8_t b4_db)
+{
+    uint8_t  status;
+    uint16_t b0_code;
+    uint16_t b1_code;
+    uint16_t b2_code;
+    uint16_t b3_code;
+    uint16_t b4_code;
+
+    // Convert dB values to register codes
+    b0_code = sgtl5000_geq_code_from_db(b0_db);
+    b1_code = sgtl5000_geq_code_from_db(b1_db);
+    b2_code = sgtl5000_geq_code_from_db(b2_db);
+    b3_code = sgtl5000_geq_code_from_db(b3_db);
+    b4_code = sgtl5000_geq_code_from_db(b4_db);
+
+    // Mute DAC during configuration
+    sgtl5000_dac_mute(true);
+
+    // Enable GEQ if not already enabled
+    status = sgtl5000_dap_geq_enable();
+    if (status != I2C_SUCCESS) {
+        sgtl5000_dac_mute(false);
+        return status;
+    }
+
+    status = sgtl5000_dap_geq_ramp_band(SGTL5000_DAP_EQ_BAND0, b0_code);
+    if (status != I2C_SUCCESS) { 
+        sgtl5000_dac_mute(false); 
+        return status; 
+    }
+
+    status = sgtl5000_dap_geq_ramp_band(SGTL5000_DAP_EQ_BAND1, b1_code);
+    if (status != I2C_SUCCESS) { 
+        sgtl5000_dac_mute(false); 
+        return status; 
+    }
+
+    status = sgtl5000_dap_geq_ramp_band(SGTL5000_DAP_EQ_BAND2, b2_code);
+    if (status != I2C_SUCCESS) { 
+        sgtl5000_dac_mute(false); 
+        return status; 
+    }
+
+    status = sgtl5000_dap_geq_ramp_band(SGTL5000_DAP_EQ_BAND3, b3_code);
+    if (status != I2C_SUCCESS) { 
+        sgtl5000_dac_mute(false); 
+        return status; 
+    }
+
+    status = sgtl5000_dap_geq_ramp_band(SGTL5000_DAP_EQ_BAND4, b4_code);
+    if (status != I2C_SUCCESS) {
+        sgtl5000_dac_mute(false);
+        return status;
+    }
+
+    // Unmute DAC after configuration
+    sgtl5000_dac_mute(false);
+    return I2C_SUCCESS;
+}
+
+
+ 
 
 /**
  * @brief Configure the DSP of SGTL5000 audio codec
@@ -395,6 +676,27 @@ uint8_t  sgtl5000_init()
         printf("Failed to set initial levels\r\n");
         return status;
     }
+    /*
+    status = sgtl5000_dap_surround_set(SGTL_SURROUND_STEREO, 7); // Enable surround sound w
+    if (status != I2C_SUCCESS) {
+        printf("Failed to set surround sound\r\n");
+        return status;
+    }
+    printf("Surround sound enabled\r\n");
 
+    
+    status = sgtl5000_dap_bass_enhance_set(true, 0x00, 0x00); // Enable bass enhancement
+    if (status != I2C_SUCCESS) {
+        printf("Failed to set bass enhancement\r\n");
+        return status;
+    }
+    */
+    sgtl5000_dap_geq_set_bands_db(-12, +12, +12, +12, -12); 
+    if (status != I2C_SUCCESS) {
+        printf("Failed to set GEQ bands\r\n");
+        return status;
+    }
+    printf("GEQ bands set\r\n");
+    
     return I2C_SUCCESS;
 }

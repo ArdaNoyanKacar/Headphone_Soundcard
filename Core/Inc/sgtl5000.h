@@ -52,11 +52,11 @@
 #define SGTL5000_DAP_FLT_COEF_ACCESS	0x010C
 #define SGTL5000_DAP_COEF_WR_B0_MSB		0x010E
 #define SGTL5000_DAP_COEF_WR_B0_LSB		0x0110
-#define SGTL5000_DAP_EQ_BASS_BAND0		0x0116
-#define SGTL5000_DAP_EQ_BASS_BAND1		0x0118
-#define SGTL5000_DAP_EQ_BASS_BAND2		0x011A
-#define SGTL5000_DAP_EQ_BASS_BAND3		0x011C
-#define SGTL5000_DAP_EQ_BASS_BAND4		0x011E
+#define SGTL5000_DAP_EQ_BAND0		    0x0116
+#define SGTL5000_DAP_EQ_BAND1		    0x0118
+#define SGTL5000_DAP_EQ_BAND2		    0x011A
+#define SGTL5000_DAP_EQ_BAND3		    0x011C
+#define SGTL5000_DAP_EQ_BAND4		    0x011E
 #define SGTL5000_DAP_MAIN_CHAN			0x0120
 #define SGTL5000_DAP_MIX_CHAN			0x0122
 #define SGTL5000_DAP_AVC_CTRL			0x0124
@@ -183,7 +183,12 @@
 #define CHIP_CLK_TOP_CTRL_INPUT_FREQ_DIV2 0x1 // 0x1 = Divide input frequency by 2
 #define CHIP_CLK_TOP_CTRL_INPUT_FREQ_DIV1 0x0 // 0x0 = Do not divide input frequency
 
-
+// Surround Sound Modes
+typedef enum {
+  SGTL_SURROUND_OFF    = 0x0, // disabled
+  SGTL_SURROUND_MONO   = 0x2, // enable, mono input
+  SGTL_SURROUND_STEREO = 0x3  // enable, stereo input
+} sgtl_surround_mode_t;
 
 // Function Prototypes
 
@@ -198,4 +203,9 @@ uint8_t  sgtl5000_reg_modify_verify(uint16_t reg, uint16_t mask, uint8_t shift, 
 uint8_t  sgtl5000_read_id();
 uint8_t  sgtl5000_print_all_regs();
 uint8_t  sgtl5000_init();
+
+uint8_t sgtl5000_dac_mute(bool mute);
+uint8_t sgtl5000_dap_surround_set(sgtl_surround_mode_t mode, uint8_t width);
+uint8_t sgtl5000_dap_bass_enhance_set(bool enable, uint8_t lr_level, uint8_t bass_level);
+uint8_t sgtl5000_dap_geq_set_bands_db(int8_t b0_db, int8_t b1_db, int8_t b2_db, int8_t b3_db, int8_t b4_db);
 #endif
