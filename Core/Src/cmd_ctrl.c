@@ -32,7 +32,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
     if (huart == &huart2) {
         char c = rx_char;
-        ctrl_putc(c); // Echo back
+        //ctrl_putc(c); // Echo back
         if (c == '\b' || c == 0x7F) {// Backspace/DEL
             if (cmd_len > 0) {
                 cmd_len--;
