@@ -23,6 +23,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "sgtl5000.h"
+#include "cmd_ctrl.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -107,7 +108,7 @@ int main(void)
   MX_USART2_UART_Init();
   MX_I2S2_Init();
   /* USER CODE BEGIN 2 */
-
+  ctrl_init();
   uint8_t status;
   status = sgtl5000_init();
   if (status != I2C_SUCCESS) {
@@ -121,7 +122,7 @@ int main(void)
   printf("SGTL5000 ANA_STATUS: 0x%04X\r\n", reg_value);
   sgtl5000_reg_read(SGTL5000_CHIP_ANA_POWER, &reg_value);
   printf("SGTL5000 ANA_POWER: 0x%04X\r\n", reg_value);
-  sgtl5000_print_all_regs(); // Print all registers for debugging
+  //sgtl5000_print_all_regs(); // Print all registers for debugging
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -133,11 +134,7 @@ int main(void)
     /* USER CODE BEGIN 3 */
     // Blink LED or do other tasks...
     HAL_GPIO_TogglePin(GPIOE, GPIO_PIN_3);
-    HAL_Delay(100);
-    HAL_GPIO_TogglePin(GPIOE, GPIO_PIN_4);
-    HAL_Delay(100);
-    HAL_GPIO_TogglePin(GPIOE, GPIO_PIN_5);
-    HAL_Delay(100);
+    ctrl_poll();
   }
   /* USER CODE END 3 */
 }
