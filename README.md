@@ -3,7 +3,7 @@
 ![System Block Diagram](https://github.com/ArdaNoyanKacar/Headphone_Soundcard/blob/bd16e1275c5a484b2d0ee54fc61b5d528ffb676d/Demo_Picture_Video/Headphone%20Soundcard%20PCBA.jpg)
 
 ## **Summary**
-**USB Headphone Soundcard** with **integrated audio effects** controlloable in runtime, utilizing **analog Baxandall volume** front end for audio taper volume control. Includes **UART Command Interface + Python GUI** for easier adjustments to audio effects. Able to drive 16Ω+ headphones
+**USB Headphone Soundcard** with **integrated audio effects** controllable in runtime, utilizing **analog Baxandall volume control** front end. Includes **UART Command Interface + Python GUI** for easier adjustments to audio effects. Able to drive 16Ω+ headphones
 
 ---
 
@@ -40,6 +40,7 @@
 
 * **Analog Baxandall Volume Control**
   * **Audio Taper** volume control
+  * **Low Johnson Noise**
 
 * **Runtime Audio Effects**
 
