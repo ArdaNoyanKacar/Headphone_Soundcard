@@ -51,9 +51,9 @@ class SoundCardApp(tk.Tk):
         ttk.Checkbutton(frame_mid, text="Bass Enhance", variable=self.bass_enable_var)\
             .grid(row=1, column=0, sticky="w", padx=6, pady=2)
         bass_params = ttk.Frame(frame_mid); bass_params.grid(row=1, column=1, sticky="w", pady=2)
-        ttk.Label(bass_params, text="LR(0..63):").pack(side="left")
+        ttk.Label(bass_params, text="LR Bass Volume:").pack(side="left")
         self.entry_bass_lr = ttk.Entry(bass_params, width=6); self.entry_bass_lr.insert(0, "5"); self.entry_bass_lr.pack(side="left", padx=(2,8))
-        ttk.Label(bass_params, text="Level(0..127):").pack(side="left")
+        ttk.Label(bass_params, text="Bass Level:").pack(side="left")
         self.entry_bass_level = ttk.Entry(bass_params, width=6); self.entry_bass_level.insert(0, "31"); self.entry_bass_level.pack(side="left", padx=(2,0))
         ttk.Button(frame_mid, text="Apply Bass Enhance", command=self.apply_bass_enhance)\
             .grid(row=1, column=2, padx=6, pady=2, sticky="w")
@@ -63,7 +63,7 @@ class SoundCardApp(tk.Tk):
         ttk.Checkbutton(frame_mid, text="Surround", variable=self.sur_enable_var)\
             .grid(row=2, column=0, sticky="w", padx=6, pady=2)
         sur_params = ttk.Frame(frame_mid); sur_params.grid(row=2, column=1, sticky="w", pady=2)
-        ttk.Label(sur_params, text="Width(0..7):").pack(side="left")
+        ttk.Label(sur_params, text="Width(0-7):").pack(side="left")
         self.entry_sur_width = ttk.Entry(sur_params, width=6); self.entry_sur_width.insert(0, "4"); self.entry_sur_width.pack(side="left", padx=(2,0))
         ttk.Button(frame_mid, text="Apply Surround", command=self.apply_surround)\
             .grid(row=2, column=2, padx=6, pady=2, sticky="w")
